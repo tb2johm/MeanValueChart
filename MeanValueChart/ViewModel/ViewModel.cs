@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Media;
 using LiveCharts;
 using LiveCharts.Configurations;
 using LiveCharts.Wpf;
@@ -38,6 +39,9 @@ namespace MeanValueChart.ViewModel
                 .X(dayModel => (double)dayModel.DateTime.Ticks / TimeSpan.FromDays(1).Ticks)
                 .Y(dayModel => dayModel.Value);
 
+
+            var mean2Points = LowPassList(meanPoints);
+
             SeriesCollection = new SeriesCollection(dayConfig)
             {
                 new ScatterSeries
@@ -46,8 +50,13 @@ namespace MeanValueChart.ViewModel
                 },
                 new LineSeries
                 {
-                    Values = new ChartValues<DateTimeDataPoint>(meanPoints)
+                    Values = new ChartValues<DateTimeDataPoint>(meanPoints), Fill = Brushes.Transparent
+                },
+                new LineSeries
+                {
+                    Values = new ChartValues<DateTimeDataPoint>(mean2Points), Fill = Brushes.Transparent
                 }
+
             };
 
             Formatter = value => new DateTime((long)(value * TimeSpan.FromDays(1).Ticks)).ToString("G");
@@ -55,7 +64,7 @@ namespace MeanValueChart.ViewModel
 
 
         enum MeanInterval { Days, Hours };
-        private IEnumerable<DateTimeDataPoint> CreateMeanPoints(IEnumerable<DateTimeDataPoint> points, MeanInterval interval = MeanInterval.Days)
+        private List<DateTimeDataPoint> CreateMeanPoints(List<DateTimeDataPoint> points, MeanInterval interval = MeanInterval.Days)
         {
             List<DateTimeDataPoint> averagePoints = new List<DateTimeDataPoint>();
             
@@ -77,6 +86,17 @@ namespace MeanValueChart.ViewModel
             }
 
             return averagePoints;
+        }
+
+        private List<DateTimeDataPoint> LowPassList(List<DateTimeDataPoint> meanPoints)
+        {
+            var lowPassList = new List<DateTimeDataPoint>();
+            int degree = 5, meanSize = meanPoints.Count;
+            for (int i = 0; i < meanSize; ++i)
+            {
+                lowPassList.Add(new DateTimeDataPoint(meanPoints[i].DateTime, (meanPoints[Math.Max(i - 2, 0)].Value + meanPoints[Math.Max(i - 1, 0)].Value + meanPoints[i].Value + meanPoints[Math.Min(i + 1, meanSize - 1)].Value + meanPoints[Math.Min(i + 2, meanSize - 1)].Value) / degree));
+            }
+            return lowPassList;
         }
 
 
@@ -116,7 +136,7 @@ namespace MeanValueChart.ViewModel
     public class DateTimeDataPoint
     {
         public DateTime DateTime { get; private set; }
-        public Double Value { get; private set; }
+        public Double Value { get; set; }
 
         public DateTimeDataPoint(DateTime dateTime, Double value)
         {
